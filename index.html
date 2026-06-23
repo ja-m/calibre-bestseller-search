@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bestseller & Calibre-Abgleich</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f10;--bg2:#1a1a1e;--bg3:#222228;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.16);
+  --text:#f0ede8;--muted:#8a8880;
+  --accent:#e8a838;--accent2:#c47b1a;
+  --green:#3fb88a;--red:#e05c4a;--blue:#4a8de0;
+  --r:10px;--rs:6px;
+  --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;line-height:1.6}
+header{border-bottom:1px solid var(--border);padding:1.2rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg);z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo h1{font-size:17px;font-weight:600;letter-spacing:-.02em}
+.logo small{font-size:12px;color:var(--muted)}
+.hst{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot.g{background:var(--green)}.dot.a{background:var(--accent)}.dot.r{background:var(--red)}
+main{max-width:980px;margin:0 auto;padding:2rem 1.5rem 4rem}
+
+.info{background:rgba(74,141,224,0.07);border:1px solid rgba(74,141,224,0.2);border-radius:var(--rs);padding:.8rem 1.1rem;font-size:13px;color:#7aacec;margin-bottom:1.5rem;line-height:1.7}
+.info a{color:var(--accent);text-decoration:none}.info a:hover{text-decoration:underline}
+.info ol{margin:.4rem 0 0 1.2em}.info li{margin-bottom:2px}
+.info code{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:11px;font-family:monospace;color:var(--accent)}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:1.4rem 1.6rem;margin-bottom:1.2rem}
+.card-title{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem}
+
+.paste-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem}
+.paste-col label{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.paste-col label a{color:var(--accent);text-decoration:none;font-size:11px;text-transform:none;letter-spacing:0}
+.paste-col label a:hover{text-decoration:underline}
+.paste-col textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);padding:10px;color:var(--text);font-family:var(--font);font-size:12px;resize:vertical;min-height:180px;outline:none;transition:border-color .15s;line-height:1.5}
+.paste-col textarea:focus{border-color:var(--accent)}
+.paste-col textarea::placeholder{color:var(--muted);opacity:.35;font-size:11px}
+
+.db-row{display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap}
+.db-btn{padding:8px 14px;border-radius:var(--rs);border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:13px;font-family:var(--font);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.db-btn:hover{border-color:var(--accent);color:var(--accent)}
+.db-btn.loaded{border-color:var(--green);color:var(--green)}
+#dbFileInput{display:none}
+
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button{padding:9px 20px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text);font-size:13px;font-family:var(--font);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+button:hover{background:var(--bg3)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#1a1000;font-weight:600}
+button.primary:hover{background:var(--accent2);border-color:var(--accent2)}
+button:disabled{opacity:.4;cursor:not-allowed}
+
+.status-bar{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:.7rem 1.1rem;margin-bottom:1.2rem;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.spinner{width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.ebox{border-radius:var(--rs);padding:.75rem 1rem;font-size:13px;margin-bottom:1rem;line-height:1.7;white-space:pre-wrap}
+.ebox.err{background:rgba(224,92,74,.08);border:1px solid rgba(224,92,74,.25);color:var(--red)}
+.ebox.warn{background:rgba(232,168,56,.08);border:1px solid rgba(232,168,56,.25);color:var(--accent)}
+.ebox.ok{background:rgba(63,184,138,.08);border:1px solid rgba(63,184,138,.25);color:var(--green)}
+
+.dbglog{font-family:monospace;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;margin-bottom:1rem;max-height:140px;overflow-y:auto;white-space:pre-wrap;line-height:1.6}
+.dbglog .ok{color:var(--green)}.dbglog .bad{color:var(--red)}.dbglog .dim{color:var(--muted)}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:2rem}
+.stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:1rem 1.2rem}
+.stat-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:4px}
+.stat-val{font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.stat-val.a{color:var(--accent)}.stat-val.g{color:var(--green)}.stat-val.r{color:var(--red)}.stat-val.b{color:var(--blue)}
+
+.filter-row{display:flex;gap:8px;margin-bottom:1rem;align-items:center;flex-wrap:wrap}
+.filter-row input,.filter-row select{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:7px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color .15s}
+.filter-row input:focus,.filter-row select:focus{border-color:var(--accent)}
+.filter-row input{flex:1;max-width:260px}
+.filter-row select{appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a8880' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-color:var(--bg2);cursor:pointer}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:1rem}
+.tab{padding:7px 14px;font-size:13px;border:none;background:transparent;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;transition:all .15s;font-family:var(--font)}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.cnt{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:2px 10px;color:var(--muted);margin-left:auto}
+
+.book-list{display:flex;flex-direction:column;gap:8px}
+.bk{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1.1rem;display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:start;transition:border-color .15s}
+.bk:hover{border-color:var(--border2)}
+.bk-rank{font-size:13px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums;font-weight:500;padding-top:3px}
+.bk-rank.top{color:var(--accent);font-weight:700}
+.bk-title{font-size:14px;font-weight:600;margin-bottom:2px}
+.bk-author{font-size:13px;color:var(--muted)}
+.bk-pub{font-size:11px;color:var(--muted);opacity:.6;margin-top:1px}
+.bk-right{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;padding-top:2px}
+.badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap;border:1px solid}
+.badge.in{background:rgba(63,184,138,.12);border-color:rgba(63,184,138,.3);color:var(--green)}
+.badge.out{background:rgba(224,92,74,.12);border-color:rgba(224,92,74,.3);color:var(--red)}
+.badge.cat{background:rgba(232,168,56,.12);border-color:rgba(232,168,56,.3);color:var(--accent)}
+.badge.dup{background:rgba(74,141,224,.1);border-color:rgba(74,141,224,.25);color:var(--blue);font-size:10px}
+.badge.na{background:rgba(255,255,255,.04);border-color:var(--border);color:var(--muted)}
+.links{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.lnk{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid var(--border2);color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:3px;transition:all .15s}
+.lnk:hover{border-color:var(--accent);color:var(--accent);background:rgba(232,168,56,.08)}
+.lnk.tor{opacity:.35;pointer-events:none;cursor:default}
+
+.empty{text-align:center;padding:3rem;color:var(--muted)}
+footer{border-top:1px solid var(--border);padding:1.5rem 2rem;text-align:center;font-size:12px;color:var(--muted)}
+
+/* Copy-Buttons */
+.copy-btn{font-size:10px;padding:2px 7px;border-radius:12px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .15s;display:inline-flex;align-items:center;gap:3px;margin-left:4px;vertical-align:middle}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(232,168,56,.08)}
+.copy-btn.copied{border-color:var(--green);color:var(--green);background:rgba(63,184,138,.08)}
+
+/* Manuell-Vorhanden */
+.bk.manual-found{border-color:rgba(63,184,138,.35);background:rgba(63,184,138,.04)}
+.badge.manual{background:rgba(63,184,138,.15);border-color:rgba(63,184,138,.4);color:var(--green)}
+.mark-btn{font-size:10px;padding:2px 8px;border-radius:12px;border:1px dashed var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .15s;white-space:nowrap}
+.mark-btn:hover{border-color:var(--green);color:var(--green);background:rgba(63,184,138,.08)}
+.mark-btn.active{border-color:var(--green);color:var(--green);background:rgba(63,184,138,.1);border-style:solid}
+
+/* JSON-DB Toolbar */
+.json-db-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--border)}
+.json-db-row span{font-size:12px;color:var(--muted)}
+#jsonFileInput{display:none}
+
+@media(max-width:680px){
+  .paste-grid,.stats-row{grid-template-columns:1fr 1fr}
+  header{padding:1rem}main{padding:1.2rem 1rem 3rem}
+  .bk{grid-template-columns:24px 1fr}.bk-right{display:none}
+}
+@media(max-width:440px){.paste-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon">📚</div>
+    <div><h1>Bestseller & Calibre</h1><small>SPIEGEL-Listen · Lokaler Abgleich</small></div>
+  </div>
+  <div class="hst"><div class="dot" id="dot"></div><span id="hlbl">Bereit</span></div>
+</header>
+
+<main>
+
+<div class="info">
+  <strong>Anleitung:</strong>
+  <ol>
+    <li>Öffne eine der Seiten (Link ↗ über dem Textfeld)</li>
+    <li>Klicke auf die Seite → <code>Strg+A</code> → <code>Strg+C</code></li>
+    <li>Klicke ins Textfeld → <code>Strg+V</code></li>
+    <li>Wiederhole für weitere Listen, dann <strong>Analysieren</strong> klicken</li>
+  </ol>
+</div>
+
+<div class="card">
+  <div class="card-title">Seitentexte einfügen</div>
+  <div class="paste-grid">
+    <div class="paste-col">
+      <label>Hardcover Belletristik <a href="https://www.bestsellerliste.de/spiegel-bestseller-hardcover-belletristik/" target="_blank" rel="noopener">↗ öffnen</a></label>
+      <textarea id="p0" placeholder="Hier einfügen (Strg+V)…"></textarea>
+    </div>
+    <div class="paste-col">
+      <label>Hardcover Sachbuch <a href="https://www.bestsellerliste.de/spiegel-bestseller-hardcover-sachbuch/" target="_blank" rel="noopener">↗ öffnen</a></label>
+      <textarea id="p1" placeholder="Hier einfügen (Strg+V)…"></textarea>
+    </div>
+    <div class="paste-col">
+      <label>Paperback Belletristik <a href="https://www.bestsellerliste.de/spiegel-bestseller-paperback-belletristik/" target="_blank" rel="noopener">↗ öffnen</a></label>
+      <textarea id="p2" placeholder="Hier einfügen (Strg+V)…"></textarea>
+    </div>
+    <div class="paste-col">
+      <label>Paperback Sachbuch <a href="https://www.bestsellerliste.de/spiegel-bestseller-paperback-sachbuch/" target="_blank" rel="noopener">↗ öffnen</a></label>
+      <textarea id="p3" placeholder="Hier einfügen (Strg+V)…"></textarea>
+    </div>
+    <div class="paste-col">
+      <label>Taschenbuch <a href="https://www.bestsellerliste.de/spiegel-bestseller-taschenbuecher-belletristik/" target="_blank" rel="noopener">↗ öffnen</a></label>
+      <textarea id="p4" placeholder="Hier einfügen (Strg+V)…"></textarea>
+    </div>
+  </div>
+
+  <div class="db-row">
+    <button class="db-btn" id="dbBtn" onclick="document.getElementById('dbFileInput').click()">🗄 Calibre metadata.db laden (optional)</button>
+    <input type="file" id="dbFileInput" accept=".db" onchange="loadDB(this)">
+    <span id="dbInfo" style="font-size:13px;color:var(--muted)"></span>
+  </div>
+  <div class="json-db-row">
+    <span>Manuell markierte Bücher:</span>
+    <button class="db-btn" id="jsonLoadBtn" onclick="document.getElementById('jsonFileInput').click()">📂 JSON-Datenbank laden</button>
+    <input type="file" id="jsonFileInput" accept=".json" onchange="loadManualDB(this)">
+    <button class="db-btn" id="jsonSaveBtn" onclick="saveManualDB()" disabled>💾 Speichern als JSON</button>
+    <span id="jsonInfo" style="font-size:12px;color:var(--muted)"></span>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="parseBtn" onclick="doRun()">▶ Analysieren &amp; abgleichen</button>
+    <button onclick="doClear()">Zurücksetzen</button>
+  </div>
+</div>
+
+<div class="dbglog" id="dbglog" style="display:none"></div>
+<div class="status-bar" id="sbar" style="display:none"><div class="spinner"></div><span id="stxt">…</span></div>
+<div class="ebox err" id="errbox" style="display:none"></div>
+<div class="ebox warn" id="warnbox" style="display:none"></div>
+
+<div id="statsRow" class="stats-row" style="display:none">
+  <div class="stat"><div class="stat-lbl">Gesamt</div><div class="stat-val a" id="sTotal">—</div></div>
+  <div class="stat"><div class="stat-lbl">In Calibre</div><div class="stat-val g" id="sHave">—</div></div>
+  <div class="stat"><div class="stat-lbl">Fehlen</div><div class="stat-val r" id="sMiss">—</div></div>
+  <div class="stat"><div class="stat-lbl">Duplikate</div><div class="stat-val b" id="sDup">—</div></div>
+</div>
+
+<div id="resultSec" style="display:none">
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('',this)">Alle</button>
+    <button class="tab" onclick="setTab('Hardcover',this)">Hardcover</button>
+    <button class="tab" onclick="setTab('Paperback',this)">Paperback</button>
+    <button class="tab" onclick="setTab('Taschenbuch',this)">Taschenbuch</button>
+  </div>
+  <div class="filter-row">
+    <input type="text" id="qInput" placeholder="Titel oder Autor…" oninput="render()">
+    <select id="fSel" onchange="render()">
+      <option value="">Alle anzeigen</option>
+      <option value="miss">Nicht in Calibre</option>
+      <option value="have">In Calibre</option>
+      <option value="manual">Manuell markiert</option>
+      <option value="realmiss">Wirklich fehlend</option>
+    </select>
+    <div class="cnt" id="cnt">0</div>
+  </div>
+  <div class="book-list" id="blist"></div>
+</div>
+<div class="empty" id="emptyState" style="display:none">📭 Keine Bücher gefunden</div>
+
+</main>
+<footer>Läuft vollständig lokal · SQLite via sql.js · Keine Daten verlassen dein Gerät</footer>
+
+<script>
+// ─── Konfiguration ────────────────────────────────────────────────────────────
+const FIELDS = [
+  { id:'p0', cat:'Hardcover',   sub:'Belletristik' },
+  { id:'p1', cat:'Hardcover',   sub:'Sachbuch'     },
+  { id:'p2', cat:'Paperback',   sub:'Belletristik' },
+  { id:'p3', cat:'Paperback',   sub:'Sachbuch'     },
+  { id:'p4', cat:'Taschenbuch', sub:''             },
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let cdb = null;
+let books = [];
+let dupCount = 0;
+let activeTab = '';
+const SQL_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
+
+// Manuell als vorhanden markierte Bücher: Set von keys (title+author normalisiert)
+let manualFound = new Set();
+let manualMeta  = {}; // key → {title, author, markedAt}
+
+function manualKey(b) {
+  return (b.title + '||' + (b.author||'')).toLowerCase().replace(/\s+/g,' ').trim();
+}
+
+// ─── Manuell-DB laden/speichern ───────────────────────────────────────────────
+function loadManualDB(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      manualFound = new Set(Object.keys(data.entries || {}));
+      manualMeta  = data.entries || {};
+      updateJsonInfo();
+      render();
+    } catch(err) {
+      document.getElementById('jsonInfo').textContent = '✗ Ungültige JSON-Datei';
+      document.getElementById('jsonInfo').style.color = 'var(--red)';
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function saveManualDB() {
+  const data = {
+    _version: 1,
+    _savedAt: new Date().toISOString(),
+    entries: manualMeta
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'calibre-manual-found.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function toggleManual(key, title, author) {
+  if (manualFound.has(key)) {
+    manualFound.delete(key);
+    delete manualMeta[key];
+  } else {
+    manualFound.add(key);
+    manualMeta[key] = { title, author, markedAt: new Date().toISOString() };
+  }
+  updateJsonInfo();
+  render();
+}
+
+function updateJsonInfo() {
+  const cnt = manualFound.size;
+  const info = document.getElementById('jsonInfo');
+  const btn  = document.getElementById('jsonSaveBtn');
+  info.textContent = cnt > 0 ? `${cnt} manuell markiert` : '';
+  info.style.color = 'var(--green)';
+  btn.disabled = cnt === 0;
+}
+
+// ─── Calibre ──────────────────────────────────────────────────────────────────
+async function loadDB(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const btn = document.getElementById('dbBtn');
+  const info = document.getElementById('dbInfo');
+  btn.textContent = '⏳ Wird geladen…';
+  try {
+    const buf = await file.arrayBuffer();
+    if (typeof initSqlJs === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = SQL_CDN + 'sql-wasm.js';
+        s.onload = res;
+        s.onerror = () => rej(new Error('sql.js konnte nicht geladen werden'));
+        document.head.appendChild(s);
+      });
+    }
+    const SQL = await initSqlJs({ locateFile: f => SQL_CDN + f });
+    cdb = new SQL.Database(new Uint8Array(buf));
+    btn.textContent = '✓ ' + file.name;
+    btn.classList.add('loaded');
+    try {
+      const r = cdb.exec('SELECT COUNT(*) FROM books');
+      if (r[0]) info.textContent = r[0].values[0][0] + ' Bücher in Calibre';
+    } catch(_) {}
+  } catch(e) {
+    btn.textContent = '🗄 Calibre metadata.db laden (optional)';
+    info.textContent = '✗ ' + e.message;
+    info.style.color = 'var(--red)';
+    cdb = null;
+  }
+}
+
+function checkCalibre(title) {
+  if (!cdb) return null;
+  try {
+    const clean = title.replace(/['"]/g,'').slice(0,60);
+    const r = cdb.exec(
+      `SELECT id FROM books WHERE LOWER(title) LIKE '%' || LOWER(?) || '%' LIMIT 1`,
+      [clean]
+    );
+    return r.length > 0 && r[0].values.length > 0;
+  } catch(_) { return null; }
+}
+
+// ─── Parser ───────────────────────────────────────────────────────────────────
+/*
+  Exaktes Format von bestsellerliste.de (Strg+A kopiert):
+
+  1
+  Yesteryear              ← Titel (1. Vorkommen, wird genutzt)
+  Caro Claire Burke       ← Autor
+  Yesteryear              ← Titel (2. Vorkommen, Wiederholung → ignorieren)
+  Heyne                   ← Verlag
+  24,00 €                 ← Preis → Blockende-Marker
+
+  Sonderfall "Neu":
+  5
+  NeuSturm über Christiansø    ← "Neu" klebt am Titel
+  Michael Kobr
+  Sturm über Christiansø
+  Goldmann
+  25,00 €
+
+  Sonderfall "Pause" (nur ein Wort als Titel, kein Neu):
+  6Pause                  ← Rang klebt am Titel
+  Lena Kupke
+  Pause
+  dtv
+  23,00 €
+*/
+
+function parseText(rawText, cat, sub) {
+  const result = [];
+  if (!rawText || rawText.trim().length < 20) return result;
+
+  // Normalisieren
+  const lines = rawText
+    .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  dbg(`[${cat}${sub ? ' '+sub : ''}] ${lines.length} Zeilen`, 'dim');
+
+  const priceRe  = /^\d{1,3}[,.]?\d{0,2}\s*€\s*$/;   // "24,00 €" allein auf einer Zeile
+  const rankOnlyRe = /^\d{1,2}$/;                     // "1" allein
+
+  // Stopp-Wörter: Zeilen die eindeutig Navigation/Footer sind → Block beenden
+  const stopWords = [
+    'Zum Buch bestellen','SPIEGEL-Bestseller Menü','Als Amazon-Partner',
+    'Copyright','Datenschutz','Impressum','Startseite','Gutscheine',
+    'Bestseller-Newsletter','Suchen','Kasseler-Symposium'
+  ];
+  function isStop(l) { return stopWords.some(s => l.startsWith(s)); }
+
+  // Finde den Startpunkt: erste Zeile die "1" oder eine Nummer ist
+  let startIdx = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^1$/.test(lines[i]) || /^1[A-Z\*]/.test(lines[i]) || /^\*?1\s/.test(lines[i])) {
+      startIdx = i;
+      break;
+    }
+    // Auch "1Titel" Muster
+    if (/^1[A-ZÄÖÜ]/.test(lines[i])) { startIdx = i; break; }
+  }
+
+  dbg(`Startzeile: ${startIdx} → "${lines[startIdx]}"`, 'dim');
+
+  let i = startIdx;
+  while (i < lines.length && result.length < 20) {
+    const line = lines[i];
+
+    if (isStop(line)) break;
+
+    // Erkennung Rang-Zeile: reine Zahl (1–20) oder Zahl klebt an Text
+    let rank = 0;
+    let restAfterRank = '';
+
+    // Fall A: Zeile ist nur eine Zahl "1" bis "20"
+    const rankPure = line.match(/^(\d{1,2})$/);
+    if (rankPure) {
+      rank = parseInt(rankPure[1]);
+      i++;
+      restAfterRank = '';
+    } else {
+      // Fall B: Zahl klebt an "Neu" oder direkt am Titel: "5NeuSturm…" oder "6Pause"
+      const rankGlued = line.match(/^(\d{1,2})(Neu)?([A-ZÄÖÜ*].*)$/);
+      if (rankGlued) {
+        rank = parseInt(rankGlued[1]);
+        // "Neu" Prefix entfernen, Rest ist Titelanfang
+        restAfterRank = (rankGlued[3] || '').trim();
+        i++;
+      } else {
+        i++;
+        continue; // keine Rang-Zeile
+      }
+    }
+
+    if (rank < 1 || rank > 20) continue;
+
+    // Jetzt lesen wir den Block: Titel1, Autor, Titel2(Wiederholung), Verlag, Preis
+    // Sammle Zeilen bis Preis-Zeile
+    const block = [];
+    if (restAfterRank) block.push(restAfterRank); // Titelanfang der an Rang klebte
+
+    while (i < lines.length) {
+      const bl = lines[i];
+      if (isStop(bl)) break;
+      if (priceRe.test(bl)) { i++; break; } // Preis → Blockende, i weiter
+      // Nächste Rang-Zeile?
+      if (rankOnlyRe.test(bl) && parseInt(bl) === rank + 1) break;
+      if (bl.match(/^(\d{1,2})(Neu)?[A-ZÄÖÜ]/) && parseInt(bl.match(/^(\d{1,2})/)[1]) === rank + 1) break;
+      block.push(bl);
+      i++;
+    }
+
+    dbg(`  Rang ${rank}: Block = [${block.map(b=>`"${b}"`).join(', ')}]`, 'dim');
+
+    if (block.length === 0) continue;
+
+    // Block auswerten:
+    // Typisch: [Titel, Autor, Titel(Wiederholung), Verlag]  (4 Einträge)
+    // Oder:    [Titel, Autor, Verlag]                       (3 Einträge, kein Doppel-Titel)
+    // Oder:    [TitelAnfang, Autor, Titel, Verlag]          (wenn Rang an Titel klebte)
+
+    let title = '';
+    let author = '';
+    let publisher = '';
+
+    if (block.length >= 4) {
+      // [0]=Titel1, [1]=Autor, [2]=Titel2(Doppel), [3]=Verlag
+      // Prüfe ob block[0] und block[2] ähnlich sind (Titelwiederholung)
+      const t0 = block[0].toLowerCase().replace(/[^a-züäöüß]/g,'');
+      const t2 = block[2].toLowerCase().replace(/[^a-züäöüß]/g,'');
+      const similar = t0.length > 0 && (t2.startsWith(t0.slice(0,8)) || t0.startsWith(t2.slice(0,8)));
+      if (similar) {
+        title     = block[2]; // zweite Version oft vollständiger
+        author    = block[1];
+        publisher = block[3] || '';
+      } else {
+        // Kein Doppel-Titel: [0]=Titel, [1]=Autor, [2]=was?, [3]=Verlag
+        title     = block[0];
+        author    = block[1];
+        publisher = block[block.length - 1];
+      }
+    } else if (block.length === 3) {
+      // [0]=Titel, [1]=Autor, [2]=Verlag
+      title     = block[0];
+      author    = block[1];
+      publisher = block[2];
+    } else if (block.length === 2) {
+      title  = block[0];
+      author = block[1];
+    } else if (block.length === 1) {
+      title = block[0];
+    }
+
+    // "Neu" Prefix vom Titel entfernen
+    title = title.replace(/^Neu(?=[A-ZÄÖÜ])/, '').trim();
+    // Sternchen entfernen
+    title = title.replace(/^\*\s*/, '').replace(/\s*\*$/, '').trim();
+    author = author.replace(/^\*\s*/, '').replace(/\s*\*$/, '').trim();
+
+    if (title.length < 2) continue;
+
+    dbg(`  → "${title}" / "${author}" / "${publisher}"`, 'ok');
+    result.push({ rank, title, author, publisher, cat, sub, cats: [cat] });
+  }
+
+  dbg(`[${cat}${sub ? ' '+sub : ''}] Ergebnis: ${result.length} Bücher`, result.length > 0 ? 'ok' : 'bad');
+  return result;
+}
+
+// ─── Dedup ────────────────────────────────────────────────────────────────────
+function dedup(rawBooks) {
+  const map = new Map();
+  let dups = 0;
+  for (const b of rawBooks) {
+    const key = b.title.toLowerCase().replace(/[^a-züäöüß0-9]/g,'').slice(0,45);
+    if (!map.has(key)) {
+      map.set(key, { ...b });
+    } else {
+      const ex = map.get(key);
+      if (!ex.cats.includes(b.cat)) ex.cats.push(b.cat);
+      dups++;
+    }
+  }
+  return { books: Array.from(map.values()), dups };
+}
+
+// ─── Haupt-Ablauf ─────────────────────────────────────────────────────────────
+function doRun() {
+  hideResults();
+  document.getElementById('errbox').style.display = 'none';
+  document.getElementById('warnbox').style.display = 'none';
+  document.getElementById('dbglog').style.display = 'none';
+  document.getElementById('dbglog').innerHTML = '';
+  document.getElementById('sbar').style.display = 'flex';
+  document.getElementById('parseBtn').disabled = true;
+  setDot('a');
+
+  setTimeout(() => {
+    try { _run(); }
+    catch(e) {
+      showErr('Interner Fehler: ' + e.message);
+      document.getElementById('dbglog').style.display = 'block';
+      document.getElementById('sbar').style.display = 'none';
+      setDot('r');
+      document.getElementById('parseBtn').disabled = false;
+    }
+  }, 30);
+}
+
+function _run() {
+  setstxt('Texte werden geparst…');
+
+  const rawBooks = [];
+  let filled = 0;
+  const warns = [];
+
+  for (const f of FIELDS) {
+    const text = document.getElementById(f.id).value;
+    if (!text.trim()) continue;
+    filled++;
+    const parsed = parseText(text, f.cat, f.sub);
+    if (parsed.length === 0) {
+      warns.push(`${f.cat}${f.sub ? ' ' + f.sub : ''}: Keine Bücher erkannt`);
+    }
+    rawBooks.push(...parsed);
+  }
+
+  if (filled === 0) {
+    showErr('Bitte mindestens ein Textfeld befüllen.\n\nÖffne eine Seite (↗), drücke Strg+A → Strg+C, dann hier Strg+V.');
+    document.getElementById('sbar').style.display = 'none';
+    setDot('r');
+    document.getElementById('parseBtn').disabled = false;
+    return;
+  }
+
+  // Debug-Log immer zeigen wenn Warnungen
+  if (warns.length) {
+    document.getElementById('warnbox').style.display = 'block';
+    document.getElementById('warnbox').textContent = warns.map(w => '⚠ ' + w).join('\n');
+    document.getElementById('dbglog').style.display = 'block';
+  }
+
+  setstxt('Duplikate entfernen…');
+  const dd = dedup(rawBooks);
+  dupCount = dd.dups;
+
+  setstxt('Calibre-Abgleich…');
+  books = dd.books.map(b => ({ ...b, calibre: checkCalibre(b.title) }));
+
+  document.getElementById('sbar').style.display = 'none';
+  document.getElementById('parseBtn').disabled = false;
+
+  if (books.length === 0) {
+    showErr(
+      'Keine Bücher erkannt.\n\n' +
+      'Das Debug-Log unten zeigt den Verarbeitungsstand.\n\n' +
+      'Mögliche Ursachen:\n' +
+      '• Nur ein Teil der Seite kopiert (bitte erst in die Seite klicken, dann Strg+A)\n' +
+      '• Seite hatte eine ungewöhnliche Struktur'
+    );
+    document.getElementById('dbglog').style.display = 'block';
+    setDot('r');
+    return;
+  }
+
+  document.getElementById('sTotal').textContent = books.length;
+  document.getElementById('sHave').textContent  = books.filter(b => b.calibre === true || manualFound.has(manualKey(b))).length;
+  document.getElementById('sMiss').textContent  = books.filter(b => b.calibre !== true && !manualFound.has(manualKey(b))).length;
+  document.getElementById('sDup').textContent   = dupCount;
+  document.getElementById('statsRow').style.display = 'grid';
+  document.getElementById('resultSec').style.display = 'block';
+
+  activeTab = '';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.tab').classList.add('active');
+  document.getElementById('qInput').value = '';
+  document.getElementById('fSel').value  = '';
+
+  setDot('g');
+  document.getElementById('hlbl').textContent = books.length + ' Bücher';
+  render();
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function setTab(cat, el) {
+  activeTab = cat;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function render() {
+  const q  = document.getElementById('qInput').value.toLowerCase();
+  const fs = document.getElementById('fSel').value;
+  let list = books;
+  if (activeTab) list = list.filter(b => b.cats.includes(activeTab));
+  if (q) list = list.filter(b =>
+    b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)
+  );
+  if (fs === 'miss')     list = list.filter(b => b.calibre !== true);
+  if (fs === 'have')     list = list.filter(b => b.calibre === true);
+  if (fs === 'manual')   list = list.filter(b => manualFound.has(manualKey(b)));
+  if (fs === 'realmiss') list = list.filter(b => b.calibre !== true && !manualFound.has(manualKey(b)));
+
+  document.getElementById('cnt').textContent = list.length;
+  if (!list.length) {
+    document.getElementById('blist').innerHTML = '';
+    document.getElementById('emptyState').style.display = 'block';
+    return;
+  }
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('blist').innerHTML = list.map(bookCard).join('');
+}
+
+function bookCard(b) {
+  const cats = b.cats.map(c => `<span class="badge cat">${c}</span>`).join('');
+  const dupB = b.cats.length > 1 ? '<span class="badge dup">mehrere Listen</span>' : '';
+
+  const key = manualKey(b);
+  const isManual = manualFound.has(key);
+  const isInCalibre = b.calibre === true || isManual;
+
+  let calB = '<span class="badge na">nicht geprüft</span>';
+  if (b.calibre === true) calB = '<span class="badge in">✓ In Calibre</span>';
+  if (b.calibre === false && !isManual) calB = '<span class="badge out">✗ Fehlt</span>';
+  if (isManual) calB = '<span class="badge manual">✓ Manuell vorhanden</span>';
+
+  // Escaped values for JS string attributes
+  const esc = s => String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+  // Copy buttons – only for books not in calibre (auto or manual)
+  const showCopyAndMark = b.calibre !== true;
+  const copyBtns = showCopyAndMark ? `
+    <button class="copy-btn" onclick="copyText('${esc(b.title)}',this)" title="Titel kopieren">📋 Titel</button>
+    <button class="copy-btn" onclick="copyText('${esc(b.author||'')}',this)" title="Autor kopieren">📋 Autor</button>` : '';
+
+  // Mark-button – only for books not auto-detected in calibre
+  const markBtn = showCopyAndMark ? `
+    <button class="mark-btn${isManual?' active':''}" onclick="toggleManual('${esc(key)}','${esc(b.title)}','${esc(b.author||'')}')">
+      ${isManual ? '✓ In Calibre (manuell)' : '＋ Als vorhanden markieren'}
+    </button>` : '';
+
+  const q = encodeURIComponent(b.title + (b.author && b.author !== '—' ? ' ' + b.author : ''));
+  const showLinks = !isInCalibre;
+  const torUrl = `bookszlibb74ugqojhzhg2a63w5i2atv5bqarulgczawnbmsb6s6qead.onion/search?q=${q}`;
+  const lnkHtml = showLinks ? `<div class="links">
+    <a class="lnk" href="https://annas-archive.gl/search?q=${q}" target="_blank" rel="noopener">🔍 Anna's Archive</a>
+    <a class="lnk" href="https://openlibrary.org/search?q=${q}" target="_blank" rel="noopener">📖 Open Library</a>
+    <a class="lnk" href="https://www.thalia.de/suche/?sq=${encodeURIComponent(b.title)}" target="_blank" rel="noopener">🛒 Thalia</a>
+    <a class="lnk" href="https://www.amazon.de/s?k=${q}" target="_blank" rel="noopener">📦 Amazon.de</a>
+    <span class="lnk tor" title="${x(torUrl)}">🧅 Z-Lib (Tor)</span>
+  </div>` : '';
+
+  return `<div class="bk${isManual?' manual-found':''}">
+    <div class="bk-rank${b.rank <= 3 ? ' top' : ''}">#${b.rank}</div>
+    <div>
+      <div class="bk-title">${x(b.title)}${copyBtns}</div>
+      <div class="bk-author">${x(b.author || '—')}</div>
+      ${b.publisher ? `<div class="bk-pub">${x(b.publisher)}</div>` : ''}
+      ${markBtn ? `<div style="margin-top:6px">${markBtn}</div>` : ''}
+      ${lnkHtml}
+    </div>
+    <div class="bk-right">${dupB}${cats}${calB}</div>
+  </div>`;
+}
+
+// ─── Copy to clipboard ────────────────────────────────────────────────────────
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.classList.add('copied');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✓ Kopiert';
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 1500);
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.classList.add('copied');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✓ Kopiert';
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
+function x(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Debug log ────────────────────────────────────────────────────────────────
+function dbg(msg, cls='') {
+  const el = document.getElementById('dbglog');
+  const sp = document.createElement('span');
+  if (cls) sp.className = cls;
+  sp.textContent = msg + '\n';
+  el.appendChild(sp);
+}
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+function setDot(c) {
+  document.getElementById('dot').className = 'dot' + (c ? ' '+c : '');
+}
+function setstxt(t) { document.getElementById('stxt').textContent = t; }
+function showErr(msg) {
+  const el = document.getElementById('errbox');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('hlbl').textContent = 'Fehler';
+}
+function hideResults() {
+  ['statsRow','resultSec','emptyState'].forEach(id =>
+    document.getElementById(id).style.display = 'none'
+  );
+}
+function doClear() {
+  FIELDS.forEach(f => { document.getElementById(f.id).value = ''; });
+  cdb = null; books = []; dupCount = 0;
+  document.getElementById('dbBtn').textContent = '🗄 Calibre metadata.db laden (optional)';
+  document.getElementById('dbBtn').classList.remove('loaded');
+  document.getElementById('dbInfo').textContent = '';
+  document.getElementById('dbFileInput').value = '';
+  ['errbox','warnbox','sbar','dbglog'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('dbglog').innerHTML = '';
+  hideResults();
+  setDot(''); document.getElementById('hlbl').textContent = 'Bereit';
+  // Manuell-Markierungen bleiben erhalten (die JSON-DB bleibt geladen)
+}
+</script>
+</body>
+</html>
