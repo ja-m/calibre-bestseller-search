@@ -232,7 +232,7 @@ footer{border-top:1px solid var(--border);padding:1.5rem 2rem;text-align:center;
 <div class="empty" id="emptyState" style="display:none">📭 Keine Bücher gefunden</div>
 
 </main>
-<footer>Läuft vollständig lokal · SQLite via sql.js · Keine Daten verlassen dein Gerät</footer>
+<footer>Läuft vollständig lokal · SQLite via sql.js · Keine Daten verlassen dein Gerät <span id="ver" style="margin-left:8px;color:var(--muted);font-size:12px"></span></footer>
 
 <script>
 // ─── Konfiguration ────────────────────────────────────────────────────────────
@@ -250,6 +250,10 @@ let books = [];
 let dupCount = 0;
 let activeTab = '';
 const SQL_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
+const APP_VERSION = '0.1.0';
+// Zeige Versionsinfo im Footer
+const _verEl = document.getElementById('ver');
+if (_verEl) _verEl.textContent = 'v' + APP_VERSION;
 
 // Manuell als vorhanden markierte Bücher: Set von keys (title+author normalisiert)
 let manualFound = new Set();

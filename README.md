@@ -15,6 +15,10 @@ Diese Seite ermöglicht die Suche und Filterung von Büchern aus einer Calibre-B
 - HTML5 / CSS3 / JavaScript
 - Gehostet via GitHub Pages
 
+## 🏷️ Version
+
+- 0.1.0
+
 ## 📁 Dateien
 
 | Datei | Beschreibung |
